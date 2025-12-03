@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Clutch Time 링크전 생성기 버전 1.1</title>
+    <style>
+        :root { --team-fs: 16px; --primary: #ff9500; --dark: #222; }
+
+        body { font-family: 'Pretendard', sans-serif; display: flex; height: 100vh; margin: 0; background-color: #2c3e50; overflow: hidden; }
+        
+        .sidebar { width: 360px; background: white; border-right: 1px solid #444; display: flex; flex-direction: column; z-index: 20; box-shadow: 2px 0 15px rgba(0,0,0,0.3); }
+        .sidebar-header { padding: 20px; background: var(--dark); color: white; border-bottom: 4px solid var(--primary); }
+        .sidebar-header h2 { margin: 0; font-size: 18px; color: white; }
+        .sidebar-header span { color: var(--primary); }
+
+        .tab-del { width: 14px; height: 14px; border-radius: 50%; background: rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; font-size: 9px; opacity: 0.6; margin-left: 5px; }
+        .tab-del:hover { background: #ff4d4d; color: white; opacity: 1; }
+
+        .div-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 10px 10px 0 10px; background: #333; }
+        .div-tab { padding: 8px 10px 8px 16px; background: #555; border-radius: 8px 8px 0 0; font-size: 13px; font-weight: bold; color: #ccc; cursor: pointer; user-select: none; display: flex; align-items: center; }
+        .div-tab.active { background: white; color: var(--dark); margin-bottom: -1px; z-index: 2; }
+        .div-add-btn { padding: 8px 12px; color: #aaa; cursor: pointer; font-weight: bold; display: flex; align-items: center;}
+
+        .group-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; background: white; border-bottom: 1px solid #ddd; }
+        .group-tab { padding: 5px 6px 5px 12px; background: #eee; border-radius: 20px; font-size: 12px; font-weight: bold; color: #555; cursor: pointer; display: flex; align-items: center; border: 1px solid transparent; }
+        .group-tab.active { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .group-add-btn { padding: 5px 10px; cursor: pointer; font-weight: bold; color: #007bff; background: white; border-radius: 20px; border: 1px solid #007bff; font-size: 12px;}
+
+        .controls { padding: 20px; border-bottom: 1px solid #eee; background: white; }
+        .capture-btn { width: 100%; padding: 10px; margin-bottom: 10px; background: #2ecc71; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .capture-btn.active { background: #e74c3c; }
+        
+        .zoom-control-box { background: #f0f0f0; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #ddd; }
+        .zoom-label { font-size: 12px; font-weight: bold; color: #555; display: flex; justify-content: space-between; margin-bottom: 5px; }
+
+        .input-row { display: flex; gap: 0; margin-bottom: 10px; height: 42px; }
+        textarea#teamInput { flex: 1; padding: 11px 10px; border: 2px solid #ddd; border-right: none; border-radius: 4px 0 0 4px; outline: none; font-weight: bold; resize: none; height: 100%; box-sizing: border-box; font-family: inherit; overflow: hidden; white-space: nowrap; }
+        textarea#teamInput:focus { border-color: var(--primary); border-right: 2px solid var(--primary); }
+        textarea#teamInput:disabled { background: #eee; }
+        button.action-btn { height: 100%; padding: 0 20px; background: var(--dark); color: white; border: none; border-radius: 0 4px 4px 0; cursor: pointer; font-weight: bold; }
+        button.action-btn:disabled { background: #999; }
+        
+        .slider-container { margin-top: 15px; }
+        .slider-label { font-size: 12px; font-weight: bold; color: #666; display: flex; justify-content: space-between; }
+        input[type=range] { width: 100%; margin: 0; accent-color: var(--primary); cursor: pointer; }
+
+        /* 초기화 버튼 스타일 추가 */
+        .reset-data-btn { margin-top: 15px; font-size: 11px; color: #999; text-decoration: underline; cursor: pointer; text-align: right; width: 100%; border: none; background: none;}
+        .reset-data-btn:hover { color: #ff4d4d; }
+
+        ul { list-style: none; padding: 0; margin: 0; flex: 1; overflow-y: auto; padding: 10px 20px; background: #f9f9f9;}
+        li { background: white; border: 1px solid #eee; padding: 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border-radius: 6px; cursor: grab; }
+        li:hover { border-color: var(--primary); }
+        li span.num { font-weight: bold; color: var(--primary); margin-right: 8px; width: 15px; font-size: 14px; flex-shrink: 0;}
+        li span.name { flex: 1; font-weight: 600; font-size: 14px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .del-btn { color: #ccc; cursor: pointer; font-size: 16px; padding: 5px; flex-shrink: 0;}
+        .del-btn:hover { color: #ff4d4d; }
+        
+        li.dragging { opacity: 0.4; background: #ddd; }
+        li.drop-top { border-top: 3px solid #007bff; margin-top: 3px; }
+        li.drop-bottom { border-bottom: 3px solid #007bff; margin-bottom: 3px; }
+
+        .main-view { flex: 1; overflow: hidden; display: flex; flex-direction: column; align-items: center; position: relative; }
+        .view-header { width: 100%; display: flex; justify-content: center; align-items: center; padding: 20px 0; z-index: 10; height: 50px;}
+        #viewTitle { color: white; margin: 0; font-size: 28px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.5); letter-spacing: -1px;}
+        .scroll-area { flex: 1; width: 100%; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding-top: 40px; }
+        
+        #dashboardContainer { display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 40px; padding-bottom: 100px; width: 90%; max-width: 1800px; transition: transform 0.1s linear; transform-origin: top center; }
+
+        .bracket-card { background: rgba(255, 255, 255, 0.05); border-radius: 30px; position: relative; aspect-ratio: 1 / 1; border: 2px solid transparent; transition: 0.3s; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .bracket-card.editing { border: 2px solid var(--primary); background: rgba(255, 255, 255, 0.1); transform: scale(1.02); }
+        .bracket-svg { width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 1; }
+        .center-title { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255, 255, 255, 0.15); font-size: 50px; font-weight: 900; z-index: 0; pointer-events: none; text-transform: uppercase; white-space: nowrap; }
+        
+        .node-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+        .team-node { position: absolute; width: 18%; height: 18%; background: var(--primary); border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transform: translate(-50%, -50%); padding: 2px; background-image: radial-gradient(circle at 30% 30%, #ffb347, #ff9500); pointer-events: auto; }
+        .team-text { color: #111; font-weight: 800; text-align: center; line-height: 1.1; font-size: var(--team-fs); white-space: pre; }
+
+        .match-label { cursor: pointer; transition: 0.2s; pointer-events: auto; }
+        .match-label:hover rect { fill: #ff9500; }
+        .match-label rect { fill: var(--dark); rx: 4; }
+        .match-label text { fill: white; font-size: 15px; font-weight: bold; font-family: sans-serif; text-anchor: middle; dominant-baseline: middle; pointer-events: none;}
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h2>🏀 Clutch Time <span>링크전 생성기 버전 1.1</span></h2>
+    </div>
+    
+    <div class="div-tabs" id="divTabs"></div>
+    <div class="group-tabs" id="groupTabs"></div>
+    
+    <div class="controls">
+        <button id="captureBtn" class="capture-btn">📸 캡처 모드 (하이라이트 끄기)</button>
+        <div class="zoom-control-box">
+            <div class="zoom-label"><span>🔍 화면 배율 조정</span><span id="zoomVal">100%</span></div>
+            <input type="range" id="viewZoomSlider" min="0.4" max="1.5" step="0.05" value="1">
+        </div>
+
+        <div class="input-row">
+            <textarea id="teamInput" rows="1" placeholder="팀명 (Shift+Enter 줄바꿈)"></textarea>
+            <button id="addBtn" class="action-btn">추가</button>
+        </div>
+        <div class="slider-container">
+            <div class="slider-label"><span>팀명 크기</span><span id="fsVal">16px</span></div>
+            <input type="range" id="fontSlider" min="10" max="40" value="16">
+        </div>
+        
+        <button id="resetDataBtn" class="reset-data-btn">⚠️ 모든 데이터 초기화</button>
+    </div>
+    <ul id="teamList"></ul>
+</div>
+
+<div class="main-view">
+    <div class="view-header">
+        <h1 id="viewTitle">대진표</h1>
+    </div>
+    <div class="scroll-area">
+        <div id="dashboardContainer"></div>
+    </div>
+</div>
+
+<script>
+    // 기본 데이터 구조 (초기화용)
+    const defaultData = [{ id: 'd1', name: '1부', groups: [{ id: 'g1', name: 'A조', teams: [], matchNames: {} }] }];
+    
+    let divisions = JSON.parse(JSON.stringify(defaultData));
+    let curDivIdx = 0; 
+    let curGrpIdx = 0;
+
+    const teamInput = document.getElementById('teamInput');
+    const addBtn = document.getElementById('addBtn');
+    const divTabs = document.getElementById('divTabs');
+    const groupTabs = document.getElementById('groupTabs');
+    const teamList = document.getElementById('teamList');
+    const dashboardContainer = document.getElementById('dashboardContainer');
+    const viewTitle = document.getElementById('viewTitle');
+    const fontSlider = document.getElementById('fontSlider');
+    const fsVal = document.getElementById('fsVal');
+    const captureBtn = document.getElementById('captureBtn');
+    const viewZoomSlider = document.getElementById('viewZoomSlider');
+    const zoomVal = document.getElementById('zoomVal');
+    const resetDataBtn = document.getElementById('resetDataBtn');
+
+    init();
+
+    function init() {
+        loadData(); // ★ 시작할 때 데이터 불러오기
+        refreshAll();
+        
+        addBtn.onclick = addTeam;
+        teamInput.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                addTeam(); 
+            }
+        });
+
+        fontSlider.addEventListener('input', (e) => {
+            fsVal.textContent = e.target.value + 'px';
+            document.documentElement.style.setProperty('--team-fs', e.target.value + 'px');
+            saveData(); // 설정 저장
+        });
+        
+        captureBtn.onclick = () => { curGrpIdx = (curGrpIdx === -1) ? 0 : -1; refreshAll(); };
+        
+        viewZoomSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            dashboardContainer.style.transform = `scale(${val})`;
+            zoomVal.textContent = Math.round(val * 100) + '%';
+        });
+
+        // 초기화 버튼 이벤트
+        resetDataBtn.onclick = () => {
+            if(confirm("정말로 모든 대진표 데이터를 삭제하고 초기화하시겠습니까? (되돌릴 수 없습니다)")) {
+                divisions = JSON.parse(JSON.stringify(defaultData));
+                curDivIdx = 0;
+                curGrpIdx = 0;
+                saveData();
+                refreshAll();
+                alert("초기화되었습니다.");
+            }
+        };
+    }
+
+    // ★ 데이터 저장 (Local Storage)
+    function saveData() {
+        localStorage.setItem('clutchTimeData', JSON.stringify(divisions));
+        localStorage.setItem('clutchTimeFontSize', document.getElementById('fontSlider').value);
+    }
+
+    // ★ 데이터 불러오기
+    function loadData() {
+        const saved = localStorage.getItem('clutchTimeData');
+        if (saved) {
+            try {
+                divisions = JSON.parse(saved);
+            } catch(e) {
+                console.error("데이터 로드 실패", e);
+            }
+        }
+        
+        const savedFs = localStorage.getItem('clutchTimeFontSize');
+        if (savedFs) {
+            fontSlider.value = savedFs;
+            fsVal.textContent = savedFs + 'px';
+            document.documentElement.style.setProperty('--team-fs', savedFs + 'px');
+        }
+    }
+
+    function refreshAll() {
+        renderDivTabs(); renderGroupTabs(); renderTeamList(); renderAllBrackets(); updateCaptureUI();
+        viewTitle.textContent = `${divisions[curDivIdx].name} 대진표`;
+    }
+
+    function updateCaptureUI() {
+        if (curGrpIdx === -1) {
+            teamInput.disabled = true; teamInput.placeholder = "조를 선택하면 활성화됩니다";
+            addBtn.disabled = true; captureBtn.textContent = "✎ 편집 모드로 돌아가기"; captureBtn.classList.add('active');
+        } else {
+            teamInput.disabled = false; teamInput.placeholder = "팀명 (Shift+Enter 줄바꿈)";
+            addBtn.disabled = false; captureBtn.textContent = "📸 캡처 모드 (하이라이트 끄기)"; captureBtn.classList.remove('active');
+        }
+    }
+
+    function renderDivTabs() {
+        divTabs.innerHTML = '';
+        divisions.forEach((div, idx) => {
+            const tab = document.createElement('div');
+            tab.className = `div-tab ${idx === curDivIdx ? 'active' : ''}`;
+            const span = document.createElement('span'); span.textContent = div.name; tab.appendChild(span);
+            const del = document.createElement('span'); del.className = 'tab-del'; del.textContent = '✕';
+            del.onclick = (e) => {
+                e.stopPropagation();
+                if(divisions.length <= 1) { alert("최소 1개의 부서는 있어야 합니다."); return; }
+                if(confirm(`'${div.name}' 전체를 삭제하시겠습니까?`)) { 
+                    divisions.splice(idx, 1);
+                    if(curDivIdx >= divisions.length) curDivIdx = divisions.length - 1;
+                    curGrpIdx = 0;
+                    saveData(); // ★ 변경 시 저장
+                    refreshAll();
+                }
+            };
+            tab.appendChild(del);
+            tab.onclick = () => { curDivIdx = idx; curGrpIdx = 0; refreshAll(); };
+            tab.ondblclick = () => { const n = prompt("부서명 변경:", div.name); if(n){divisions[idx].name=n; saveData(); refreshAll();} }
+            divTabs.appendChild(tab);
+        });
+        const add = document.createElement('div'); add.className='div-add-btn'; add.textContent='+';
+        add.onclick=()=>{ 
+            divisions.push({id:Date.now(), name:(divisions.length+1)+"부", groups:[{id:Date.now()+1, name:'A조', teams:[], matchNames:{}}]}); 
+            curDivIdx=divisions.length-1; curGrpIdx=0; 
+            saveData(); // ★ 변경 시 저장
+            refreshAll(); 
+        };
+        divTabs.appendChild(add);
+    }
+
+    function renderGroupTabs() {
+        groupTabs.innerHTML = '';
+        const grps = divisions[curDivIdx].groups;
+        grps.forEach((grp, idx) => {
+            const tab = document.createElement('div');
+            tab.className = `group-tab ${idx === curGrpIdx ? 'active' : ''}`;
+            const txt = document.createElement('span'); txt.textContent=grp.name; tab.appendChild(txt);
+            const del = document.createElement('span'); del.className='tab-del'; del.textContent='✕';
+            del.onclick=(e)=>{ 
+                e.stopPropagation(); 
+                if(grps.length<=1){ alert("최소 1개의 조는 있어야 합니다."); return; } 
+                if(confirm("삭제하시겠습니까?")){ 
+                    grps.splice(idx,1); curGrpIdx=0; 
+                    saveData(); // ★ 변경 시 저장
+                    refreshAll(); 
+                } 
+            };
+            tab.appendChild(del);
+            tab.onclick=()=>{ curGrpIdx=idx; refreshAll(); };
+            tab.ondblclick=()=>{ const n=prompt("조이름 변경:",grp.name); if(n){grp.name=n; saveData(); refreshAll();} };
+            groupTabs.appendChild(tab);
+        });
+        const add = document.createElement('div'); add.className='group-add-btn'; add.textContent='+';
+        add.onclick=()=>{ 
+            const n=String.fromCharCode(65+grps.length); 
+            grps.push({id:Date.now(), name:n+'조', teams:[], matchNames:{}}); 
+            curGrpIdx=grps.length-1; 
+            saveData(); // ★ 변경 시 저장
+            refreshAll(); 
+        };
+        groupTabs.appendChild(add);
+    }
+
+    function renderTeamList() {
+        teamList.innerHTML = '';
+        if (curGrpIdx === -1) { teamList.innerHTML = '<li style="justify-content:center;color:#999;border:none;">편집할 조를 선택하세요</li>'; return; }
+        const teams = divisions[curDivIdx].groups[curGrpIdx].teams;
+        teams.forEach((t, i) => {
+            const li = document.createElement('li'); li.draggable=true;
+            li.innerHTML = `<div style="display:flex;align-items:center;flex:1;min-width:0;"><span class="num">${i+1}</span><span class="name">${t}</span></div><span class="del-btn" onclick="removeTeam(${i})">&times;</span>`;
+            li.querySelector('.name').ondblclick=(e)=>{ 
+                e.stopPropagation(); 
+                const n=prompt("수정 (줄바꿈은 직접 입력 불가):",t); 
+                if(n!==null){teams[i]=n.trim(); saveData(); refreshAll();} 
+            };
+            li.addEventListener('dragstart',(e)=>{e.dataTransfer.effectAllowed='move';li.classList.add('dragging');window.srcI=i;});
+            li.addEventListener('dragend',()=>{li.classList.remove('dragging');document.querySelectorAll('li').forEach(l=>l.classList.remove('drop-top','drop-bottom'));});
+            li.addEventListener('dragover',(e)=>{
+                e.preventDefault(); if(window.srcI===i)return; 
+                const r=li.getBoundingClientRect(); 
+                if(e.clientY-r.top<r.height/2) { li.classList.add('drop-top'); li.classList.remove('drop-bottom'); } 
+                else { li.classList.add('drop-bottom'); li.classList.remove('drop-top'); }
+            });
+            li.addEventListener('dragleave', ()=>{ li.classList.remove('drop-top', 'drop-bottom'); }); 
+            li.addEventListener('drop',(e)=>{
+                e.preventDefault(); const f=window.srcI; let to=i; 
+                if(li.classList.contains('drop-bottom'))to++; if(f===to||f===to-1)return; 
+                const it=teams[f]; if(f<to){teams.splice(to,0,it);teams.splice(f,1);}else{teams.splice(f,1);teams.splice(to,0,it);} 
+                saveData(); // ★ 변경 시 저장
+                refreshAll();
+            });
+            teamList.appendChild(li);
+        });
+    }
+
+    function removeTeam(i){ 
+        if(confirm("이 팀을 삭제하시겠습니까?")) {
+            divisions[curDivIdx].groups[curGrpIdx].teams.splice(i,1); 
+            saveData(); // ★ 변경 시 저장
+            refreshAll(); 
+        }
+    }
+    
+    function addTeam(){ 
+        const v=teamInput.value.trim(); if(!v||curGrpIdx===-1)return; 
+        const ts=divisions[curDivIdx].groups[curGrpIdx].teams; if(ts.length>=8)return; 
+        ts.push(v); teamInput.value=''; 
+        saveData(); // ★ 변경 시 저장
+        refreshAll(); 
+    }
+
+    function renderAllBrackets() {
+        dashboardContainer.innerHTML = '';
+        const grps = divisions[curDivIdx].groups;
+        const count = grps.length;
+        let flexBasis = '30%'; 
+        if (count === 1) flexBasis = '60%'; else if (count === 2) flexBasis = '40%'; else if (count === 4) flexBasis = '40%'; else flexBasis = '30%'; 
+
+        grps.forEach((grp, idx) => {
+            const card = document.createElement('div');
+            card.className = `bracket-card ${idx === curGrpIdx ? 'editing' : ''}`;
+            card.style.flexBasis = flexBasis; 
+            card.onclick = () => { if(curGrpIdx===idx) curGrpIdx=-1; else curGrpIdx=idx; refreshAll(); };
+
+            const title = document.createElement('div');
+            title.className = 'center-title';
+            title.textContent = grp.name;
+            title.style.top = (grp.teams.length === 3) ? '58%' : '50%';
+            card.appendChild(title);
+
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute('viewBox', '0 0 500 500'); svg.classList.add('bracket-svg');
+            const nodeLayer = document.createElement('div');
+            nodeLayer.className = 'node-layer'; 
+
+            drawBracket(grp, svg, nodeLayer);
+            card.appendChild(svg); card.appendChild(nodeLayer);
+            dashboardContainer.appendChild(card);
+        });
+    }
+
+    function drawBracket(group, svg, nodeLayer) {
+        const teams = group.teams;
+        const n=teams.length; if(n<2)return;
+        if(!group.matchNames) group.matchNames = {};
+
+        let cx=250, cy=250, r=170; if(n===3)cy=290;
+        const coords=[];
+        for(let i=0; i<n; i++){
+            let offset = -90; 
+            if (n === 4) offset = -135; 
+            if (n === 5) offset = -162; 
+            const deg = (i * (360/n)) + offset;
+            const rad = deg * Math.PI/180;
+            coords.push({x:cx+r*Math.cos(rad), y:cy+r*Math.sin(rad)});
+        }
+        for(let i=0; i<n; i++){
+            if(n===2 && i===1) break;
+            const s=coords[i], e=coords[(i+1)%n];
+            const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+            line.setAttribute('x1',s.x); line.setAttribute('y1',s.y); line.setAttribute('x2',e.x); line.setAttribute('y2',e.y);
+            line.setAttribute('stroke','rgba(255,255,255,0.8)'); line.setAttribute('stroke-width','4'); svg.appendChild(line);
+            
+            const mx=(s.x+e.x)/2, my=(s.y+e.y)/2;
+            const g=document.createElementNS("http://www.w3.org/2000/svg","g");
+            g.classList.add('match-label');
+            
+            g.onclick = (e) => {
+                e.stopPropagation(); 
+                const currentName = group.matchNames[i] || `${i+1}경기`;
+                const newName = prompt("경기 이름/순서를 변경하세요:", currentName);
+                if(newName !== null) { group.matchNames[i] = newName; saveData(); refreshAll(); }
+            };
+
+            const labelText = group.matchNames[i] || `${i+1}경기`;
+            const textWidth = labelText.length * 12 + 20; 
+            g.innerHTML=`<rect x="${mx-(textWidth/2)}" y="${my-14}" width="${textWidth}" height="28" rx="6"/><text x="${mx}" y="${my+1}">${labelText}</text>`;
+            svg.appendChild(g);
+        }
+        teams.forEach((t,i)=>{
+            const div=document.createElement('div'); div.className='team-node';
+            div.style.left=(coords[i].x/5)+'%'; div.style.top=(coords[i].y/5)+'%';
+            div.innerHTML=`<span class="team-text">${t}</span>`;
+            nodeLayer.appendChild(div);
+        });
+    }
+</script>
+
+</body>
+</html>
