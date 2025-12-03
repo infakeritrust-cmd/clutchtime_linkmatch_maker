@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Clutch Time 링크전 생성기 버전 1.1</title>
+    <title>Clutch Time 링크전 생성기 버전 1.3</title>
     <style>
         :root { --team-fs: 16px; --primary: #ff9500; --dark: #222; }
 
@@ -44,7 +44,6 @@
         .slider-label { font-size: 12px; font-weight: bold; color: #666; display: flex; justify-content: space-between; }
         input[type=range] { width: 100%; margin: 0; accent-color: var(--primary); cursor: pointer; }
 
-        /* 초기화 버튼 스타일 추가 */
         .reset-data-btn { margin-top: 15px; font-size: 11px; color: #999; text-decoration: underline; cursor: pointer; text-align: right; width: 100%; border: none; background: none;}
         .reset-data-btn:hover { color: #ff4d4d; }
 
@@ -86,7 +85,7 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏀 Clutch Time <span>링크전 생성기 버전 1.1</span></h2>
+        <h2>🏀 Clutch Time <span>링크전 생성기 버전 1.3</span></h2>
     </div>
     
     <div class="div-tabs" id="divTabs"></div>
@@ -123,7 +122,6 @@
 </div>
 
 <script>
-    // 기본 데이터 구조 (초기화용)
     const defaultData = [{ id: 'd1', name: '1부', groups: [{ id: 'g1', name: 'A조', teams: [], matchNames: {} }] }];
     
     let divisions = JSON.parse(JSON.stringify(defaultData));
@@ -147,11 +145,14 @@
     init();
 
     function init() {
-        loadData(); // ★ 시작할 때 데이터 불러오기
+        loadData();
         refreshAll();
         
         addBtn.onclick = addTeam;
+        
+        // ★ 한글 IME 버그 완벽 수정 (e.isComposing)
         teamInput.addEventListener('keydown', (e) => { 
+            if (e.isComposing) return; // 한글 조립 중이면 엔터 처리 안 함
             if (e.key === 'Enter' && !e.shiftKey) { 
                 e.preventDefault(); 
                 addTeam(); 
@@ -161,7 +162,7 @@
         fontSlider.addEventListener('input', (e) => {
             fsVal.textContent = e.target.value + 'px';
             document.documentElement.style.setProperty('--team-fs', e.target.value + 'px');
-            saveData(); // 설정 저장
+            saveData();
         });
         
         captureBtn.onclick = () => { curGrpIdx = (curGrpIdx === -1) ? 0 : -1; refreshAll(); };
@@ -172,7 +173,6 @@
             zoomVal.textContent = Math.round(val * 100) + '%';
         });
 
-        // 초기화 버튼 이벤트
         resetDataBtn.onclick = () => {
             if(confirm("정말로 모든 대진표 데이터를 삭제하고 초기화하시겠습니까? (되돌릴 수 없습니다)")) {
                 divisions = JSON.parse(JSON.stringify(defaultData));
@@ -185,23 +185,16 @@
         };
     }
 
-    // ★ 데이터 저장 (Local Storage)
     function saveData() {
         localStorage.setItem('clutchTimeData', JSON.stringify(divisions));
         localStorage.setItem('clutchTimeFontSize', document.getElementById('fontSlider').value);
     }
 
-    // ★ 데이터 불러오기
     function loadData() {
         const saved = localStorage.getItem('clutchTimeData');
         if (saved) {
-            try {
-                divisions = JSON.parse(saved);
-            } catch(e) {
-                console.error("데이터 로드 실패", e);
-            }
+            try { divisions = JSON.parse(saved); } catch(e) { console.error("데이터 로드 실패", e); }
         }
-        
         const savedFs = localStorage.getItem('clutchTimeFontSize');
         if (savedFs) {
             fontSlider.value = savedFs;
@@ -239,7 +232,7 @@
                     divisions.splice(idx, 1);
                     if(curDivIdx >= divisions.length) curDivIdx = divisions.length - 1;
                     curGrpIdx = 0;
-                    saveData(); // ★ 변경 시 저장
+                    saveData();
                     refreshAll();
                 }
             };
@@ -252,7 +245,7 @@
         add.onclick=()=>{ 
             divisions.push({id:Date.now(), name:(divisions.length+1)+"부", groups:[{id:Date.now()+1, name:'A조', teams:[], matchNames:{}}]}); 
             curDivIdx=divisions.length-1; curGrpIdx=0; 
-            saveData(); // ★ 변경 시 저장
+            saveData();
             refreshAll(); 
         };
         divTabs.appendChild(add);
@@ -271,7 +264,7 @@
                 if(grps.length<=1){ alert("최소 1개의 조는 있어야 합니다."); return; } 
                 if(confirm("삭제하시겠습니까?")){ 
                     grps.splice(idx,1); curGrpIdx=0; 
-                    saveData(); // ★ 변경 시 저장
+                    saveData();
                     refreshAll(); 
                 } 
             };
@@ -285,7 +278,7 @@
             const n=String.fromCharCode(65+grps.length); 
             grps.push({id:Date.now(), name:n+'조', teams:[], matchNames:{}}); 
             curGrpIdx=grps.length-1; 
-            saveData(); // ★ 변경 시 저장
+            saveData();
             refreshAll(); 
         };
         groupTabs.appendChild(add);
@@ -316,7 +309,7 @@
                 e.preventDefault(); const f=window.srcI; let to=i; 
                 if(li.classList.contains('drop-bottom'))to++; if(f===to||f===to-1)return; 
                 const it=teams[f]; if(f<to){teams.splice(to,0,it);teams.splice(f,1);}else{teams.splice(f,1);teams.splice(to,0,it);} 
-                saveData(); // ★ 변경 시 저장
+                saveData();
                 refreshAll();
             });
             teamList.appendChild(li);
@@ -326,16 +319,19 @@
     function removeTeam(i){ 
         if(confirm("이 팀을 삭제하시겠습니까?")) {
             divisions[curDivIdx].groups[curGrpIdx].teams.splice(i,1); 
-            saveData(); // ★ 변경 시 저장
+            saveData();
             refreshAll(); 
         }
     }
     
     function addTeam(){ 
-        const v=teamInput.value.trim(); if(!v||curGrpIdx===-1)return; 
-        const ts=divisions[curDivIdx].groups[curGrpIdx].teams; if(ts.length>=8)return; 
-        ts.push(v); teamInput.value=''; 
-        saveData(); // ★ 변경 시 저장
+        const v=teamInput.value.trim(); 
+        if(!v||curGrpIdx===-1)return; 
+        const ts=divisions[curDivIdx].groups[curGrpIdx].teams; 
+        if(ts.length>=8)return; 
+        ts.push(v); 
+        teamInput.value=''; 
+        saveData();
         refreshAll(); 
     }
 
